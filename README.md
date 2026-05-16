@@ -1,9 +1,46 @@
-[![Static](https://img.shields.io/badge/demo-%23646CFF.svg?logo=html5&logoColor=white)](https://pmndrs.github.io/examples/grass-shader)
-[![CodeSandbox](https://img.shields.io/badge/codesandbox-040404?logo=codesandbox&logoColor=DBDBDB)](https://codesandbox.io/s/github/pmndrs/examples/tree/main/demos/grass-shader)
-[![Stackblitz](https://img.shields.io/badge/stackblitz-fff?logo=Stackblitz&logoColor=1389FD)](https://stackblitz.com/github/pmndrs/examples/tree/main/demos/grass-shader)
+# Buko Website
+
+Teaser landing page for Buko, "Software for Human Kind."
+
+The site is a static React + Vite app with an animated Three.js scene: grass, sky, clouds, stars, moonlight, and a simple brand overlay.
+
+## Stack
+
+- React + Vite
+- React Three Fiber
+- Drei
+- Three.js
+
+## Development
+
+Install dependencies:
 
 ```sh
-$ npx degit pmndrs/examples/demos/grass-shader
+npm install
 ```
 
-![](thumbnail.webp)
+Start the local dev server:
+
+```sh
+npm run dev
+```
+
+Build for production:
+
+```sh
+npm run build
+```
+
+Preview the production build:
+
+```sh
+npm run preview
+```
+
+## Deployment
+
+The production build outputs static files to `dist/`. Deploy that directory with Netlify or another static host.
+
+## Fonts
+
+`index.html` loads the Adobe Fonts kit for the Obviously wordmark and Google Fonts for Inter supporting text.

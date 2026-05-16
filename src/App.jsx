@@ -164,9 +164,26 @@ export default function App() {
         <Scene />
       </Canvas>
 
-      <div className="overlay">
-        <h1>Buko</h1>
-        <p>Software for Human Kind</p>
+      <div className="brand-overlay" aria-label="Buko, a software company. Coming soon.">
+        <div className="brand-topline" aria-hidden="true">
+          <span>Software</span>
+          <span>For</span>
+          <span>Human</span>
+          <span>Kind</span>
+        </div>
+
+        <main className="brand-lockup">
+          <h1>Buko</h1>
+          <p>A Software Company</p>
+        </main>
+
+        <div className="brand-footer" aria-label="@BukoHQ, coming soon, copyright 2026">
+          <a href="https://instagram.com/bukohq" target="_blank" rel="noreferrer">
+            @BukoHQ
+          </a>
+          <span>Coming Soon</span>
+          <span>&copy;2026</span>
+        </div>
       </div>
     </div>
   )
