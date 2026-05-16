@@ -1,6 +1,6 @@
-import React, { Suspense, useRef, useState } from "react"
+import React, { Suspense, useEffect, useRef, useState } from "react"
 import * as THREE from "three"
-import { Canvas, useFrame } from "@react-three/fiber"
+import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { Sky, OrbitControls, Cloud, Clouds, Stars, Sparkles } from "@react-three/drei"
 import Grass from "./Grass"
 import "./styles.css"
@@ -64,6 +64,28 @@ function DynamicSky({ phaseRef }) {
   )
 }
 
+function ResponsiveCamera() {
+  const { camera, size } = useThree()
+
+  useEffect(() => {
+    const portrait = size.height > size.width
+    const mobile = Math.min(size.width, size.height) < 700
+
+    if (portrait && mobile) {
+      camera.position.set(20, 18, 16)
+      camera.fov = 58
+    } else {
+      camera.position.set(15, 15, 10)
+      camera.fov = 50
+    }
+
+    camera.lookAt(0, 2, 0)
+    camera.updateProjectionMatrix()
+  }, [camera, size.height, size.width])
+
+  return null
+}
+
 function Scene() {
   const phaseRef         = useRef(0)
   const ambientRef       = useRef()
@@ -113,6 +135,7 @@ function Scene() {
 
   return (
     <>
+      <ResponsiveCamera />
       <DynamicSky phaseRef={phaseRef} />
 
       <ambientLight ref={ambientRef} intensity={3} />
@@ -138,7 +161,7 @@ function Scene() {
         <Grass phaseRef={phaseRef} />
 
         <Sparkles ref={daySparklesRef}   count={180} scale={[90, 14, 90]} position={[0, 3, 0]} size={2.5} speed={0.35} color="white"   opacity={0.45} />
-        <Sparkles ref={nightSparklesRef} count={180} scale={[90, 14, 90]} position={[0, 3, 0]} size={5}   speed={0.12} color="#99ffaa" opacity={0.85} visible={false} />
+        <Sparkles ref={nightSparklesRef} count={260} scale={[90, 14, 90]} position={[0, 3, 0]} size={12}  speed={0.12} color="#ffd95a" opacity={0.95} visible={false} />
 
         {/* Clouds visible day and night */}
         <Clouds material={THREE.MeshLambertMaterial} limit={600}>
@@ -152,7 +175,7 @@ function Scene() {
         </Clouds>
       </Suspense>
 
-      <OrbitControls minPolarAngle={Math.PI / 2.5} maxPolarAngle={Math.PI / 2.5} />
+      <OrbitControls target={[0, 2, 0]} minPolarAngle={Math.PI / 2.5} maxPolarAngle={Math.PI / 2.5} />
     </>
   )
 }
@@ -160,7 +183,7 @@ function Scene() {
 export default function App() {
   return (
     <div className="container">
-      <Canvas camera={{ position: [15, 15, 10] }}>
+      <Canvas camera={{ position: [15, 15, 10], fov: 50 }}>
         <Scene />
       </Canvas>
 
