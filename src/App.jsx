@@ -1,11 +1,16 @@
-import React, { Suspense, useEffect, useRef, useState } from "react"
+import React, { forwardRef, Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { Sky, OrbitControls, Cloud, Clouds, Stars, Sparkles } from "@react-three/drei"
+import { OrbitControls, Cloud, Clouds, Sky, Stars, Sparkles } from "@react-three/drei"
 import Grass from "./Grass"
 import "./styles.css"
 
 const CYCLE = 120
+const START_PHASE = 0.25
+
+function getInclination(phase) {
+  return 0.44 + 0.17 * Math.sin(phase * Math.PI * 2)
+}
 
 // Smooth 0→1 S-curve between two edges
 function smoothstep(e0, e1, x) {
@@ -22,8 +27,28 @@ const DAY_AMB   = new THREE.Color("#ffffff")
 const NIGHT_DIR = new THREE.Color("#334466")
 const DAWN_DIR  = new THREE.Color("#ff7733")
 const DAY_DIR   = new THREE.Color("#ffffff")
+const _moonPosition = new THREE.Vector3()
 
-// Sky isolated so only it re-renders on inclination change
+function getNightProgress(phase) {
+  const nightStart = Math.asin((0.40 - 0.44) / 0.17) / (Math.PI * 2) + 0.5
+  const nightEnd = 1 + Math.asin((0.40 - 0.44) / 0.17) / (Math.PI * 2)
+
+  if (phase < nightStart && phase > nightEnd - 1) return null
+
+  const adjustedPhase = phase >= nightStart ? phase : phase + 1
+  return Math.max(0, Math.min(1, (adjustedPhase - nightStart) / (nightEnd - nightStart)))
+}
+
+function getMoonPosition(phase, target = _moonPosition) {
+  const nightProgress = getNightProgress(phase) ?? 0
+  const angle = Math.PI * nightProgress
+  const x = 62 - 124 * nightProgress
+  const y = 26 + Math.sin(angle) * 38
+  const z = -72 + Math.cos(angle) * 12
+
+  return target.set(x, y, z)
+}
+
 function DynamicSky({ phaseRef }) {
   const [incl, setIncl]           = useState(0.44)
   const [turbidity, setTurbidity] = useState(10)
@@ -33,11 +58,10 @@ function DynamicSky({ phaseRef }) {
   const lastIncl  = useRef(0.44)
 
   useFrame(() => {
-    const newIncl = 0.44 + 0.17 * Math.sin(phaseRef.current * Math.PI * 2)
+    const newIncl = getInclination(phaseRef.current)
     const night   = newIncl < 0.40
     const dp      = night ? 0 : Math.min(1, (newIncl - 0.40) / 0.21)
 
-    // Update sky every frame for perfectly smooth transitions
     if (Math.abs(newIncl - lastIncl.current) > 0.001) {
       lastIncl.current = newIncl
       setIncl(newIncl)
@@ -51,6 +75,7 @@ function DynamicSky({ phaseRef }) {
   })
 
   if (isNight) return <color attach="background" args={["#050815"]} />
+
   return (
     <Sky
       azimuth={1}
@@ -72,10 +97,10 @@ function ResponsiveCamera() {
     const mobile = Math.min(size.width, size.height) < 700
 
     if (portrait && mobile) {
-      camera.position.set(20, 18, 16)
+      camera.position.set(39, 35, 32)
       camera.fov = 58
     } else {
-      camera.position.set(15, 15, 10)
+      camera.position.set(40, 37, 28)
       camera.fov = 50
     }
 
@@ -86,21 +111,109 @@ function ResponsiveCamera() {
   return null
 }
 
+function createFireflyTexture() {
+  const canvas = document.createElement("canvas")
+  canvas.width = 64
+  canvas.height = 64
+
+  const context = canvas.getContext("2d")
+  const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32)
+  gradient.addColorStop(0, "rgba(255, 255, 230, 1)")
+  gradient.addColorStop(0.28, "rgba(255, 248, 160, 0.95)")
+  gradient.addColorStop(0.65, "rgba(255, 217, 90, 0.28)")
+  gradient.addColorStop(1, "rgba(255, 217, 90, 0)")
+
+  context.fillStyle = gradient
+  context.fillRect(0, 0, 64, 64)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
+const Fireflies = forwardRef(function Fireflies({ count = 36, phaseRef, ...props }, ref) {
+  const pointsRef = useRef()
+  useImperativeHandle(ref, () => pointsRef.current)
+
+  const seeds = useMemo(() => {
+    return Array.from({ length: count }, () => ({
+      x: Math.random() * 90 - 45,
+      y: Math.random() * 10 + 2,
+      z: Math.random() * 90 - 45,
+      driftX: Math.random() * 2.5 + 0.8,
+      driftY: Math.random() * 1.2 + 0.4,
+      driftZ: Math.random() * 2.5 + 0.8,
+      speed: Math.random() * 0.45 + 0.18,
+      phase: Math.random() * Math.PI * 2,
+    }))
+  }, [count])
+  const positions = useMemo(() => new Float32Array(count * 3), [count])
+  const texture = useMemo(() => createFireflyTexture(), [])
+
+  useFrame(({ clock }) => {
+    if (!pointsRef.current) return
+
+    const time = clock.elapsedTime
+    const incl = getInclination(phaseRef.current)
+    const fade = 1 - smoothstep(0.35, 0.43, incl)
+    const attribute = pointsRef.current.geometry.attributes.position
+
+    pointsRef.current.visible = fade > 0.01
+    pointsRef.current.material.opacity = fade * 0.95
+    if (fade <= 0.01) return
+
+    for (let i = 0; i < count; i++) {
+      const seed = seeds[i]
+      const index = i * 3
+      const t = time * seed.speed + seed.phase
+
+      positions[index] = seed.x + Math.sin(t) * seed.driftX
+      positions[index + 1] = seed.y + Math.sin(t * 1.7) * seed.driftY
+      positions[index + 2] = seed.z + Math.cos(t * 0.8) * seed.driftZ
+    }
+
+    attribute.needsUpdate = true
+  })
+
+  return (
+    <points ref={pointsRef} visible={false} {...props}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        color="#fff6a8"
+        map={texture}
+        alphaMap={texture}
+        alphaTest={0.02}
+        size={1.8}
+        sizeAttenuation
+        transparent
+        opacity={0}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  )
+})
+
 function Scene() {
-  const phaseRef         = useRef(0)
+  const phaseRef         = useRef(START_PHASE)
   const ambientRef       = useRef()
   const dirLightRef      = useRef()
   const starsRef         = useRef()
   const daySparklesRef   = useRef()
   const nightSparklesRef = useRef()
   const moonRef          = useRef()
+  const moonCoreRef      = useRef()
+  const moonHaloRef      = useRef()
+  const moonLightRef     = useRef()
 
   useFrame(({ clock }) => {
-    const phase = (clock.elapsedTime % CYCLE) / CYCLE
+    const phase = ((clock.elapsedTime % CYCLE) / CYCLE + START_PHASE) % 1
     phaseRef.current = phase
 
-    const incl = 0.44 + 0.17 * Math.sin(phase * Math.PI * 2)
-    const night = incl < 0.40
+    const incl = getInclination(phase)
+    const nightFade = 1 - smoothstep(0.35, 0.46, incl)
 
     // brightness: 0 at deep night, 1 at midday — smooth S-curve
     const brightness = smoothstep(0.37, 0.61, incl)
@@ -127,10 +240,24 @@ function Scene() {
       dirLightRef.current.color.copy(_dirCol)
     }
 
-    if (starsRef.current)         starsRef.current.visible         = night
-    if (daySparklesRef.current)   daySparklesRef.current.visible   = !night
-    if (nightSparklesRef.current) nightSparklesRef.current.visible = night
-    if (moonRef.current)          moonRef.current.visible          = night
+    if (starsRef.current) {
+      starsRef.current.visible = nightFade > 0.01
+      if (starsRef.current.material) {
+        starsRef.current.material.transparent = true
+        starsRef.current.material.opacity = nightFade
+      }
+    }
+    if (daySparklesRef.current) daySparklesRef.current.visible = nightFade < 0.5
+
+    const nightProgress = getNightProgress(phase)
+    const moonFade = nightProgress == null ? 0 : smoothstep(0, 0.12, nightProgress) * (1 - smoothstep(0.86, 1, nightProgress))
+    if (moonRef.current) {
+      moonRef.current.visible = moonFade > 0.01
+      moonRef.current.position.copy(getMoonPosition(phase))
+    }
+    if (moonCoreRef.current) moonCoreRef.current.opacity = moonFade
+    if (moonHaloRef.current) moonHaloRef.current.opacity = moonFade * 0.12
+    if (moonLightRef.current) moonLightRef.current.intensity = moonFade * 1.2
   })
 
   return (
@@ -142,26 +269,26 @@ function Scene() {
       <directionalLight ref={dirLightRef} position={[50, 80, -30]} intensity={2.5} />
       <pointLight position={[10, 10, 10]} intensity={0.5} />
 
-      <Stars ref={starsRef} radius={120} depth={60} count={6000} factor={5} saturation={0} fade speed={0.6} visible={false} />
+      <Stars ref={starsRef} radius={120} depth={60} count={7000} factor={7} saturation={0} fade speed={0.6} visible={false} />
 
       {/* Moon — core disc + soft halo + moonlight, only visible at night */}
       <group ref={moonRef} position={[-25, 52, -70]} visible={false}>
         <mesh>
           <sphereGeometry args={[3, 32, 32]} />
-          <meshStandardMaterial color="#fffff8" emissive="#fffff8" emissiveIntensity={2} roughness={0.9} />
+          <meshStandardMaterial ref={moonCoreRef} color="#fffff8" emissive="#fffff8" emissiveIntensity={2} roughness={0.9} transparent opacity={0} />
         </mesh>
         <mesh>
           <sphereGeometry args={[5, 32, 32]} />
-          <meshStandardMaterial color="#aabbff" emissive="#aabbff" emissiveIntensity={0.4} transparent opacity={0.12} depthWrite={false} />
+          <meshStandardMaterial ref={moonHaloRef} color="#aabbff" emissive="#aabbff" emissiveIntensity={0.4} transparent opacity={0} depthWrite={false} />
         </mesh>
-        <pointLight color="#ccd8ff" intensity={1.2} distance={350} decay={1} />
+        <pointLight ref={moonLightRef} color="#ccd8ff" intensity={0} distance={350} decay={1} />
       </group>
 
       <Suspense fallback={null}>
         <Grass phaseRef={phaseRef} />
 
-        <Sparkles ref={daySparklesRef}   count={180} scale={[90, 14, 90]} position={[0, 3, 0]} size={2.5} speed={0.35} color="white"   opacity={0.45} />
-        <Sparkles ref={nightSparklesRef} count={260} scale={[90, 14, 90]} position={[0, 3, 0]} size={12}  speed={0.12} color="#ffd95a" opacity={0.95} visible={false} />
+        <Sparkles ref={daySparklesRef} count={180} scale={[90, 14, 90]} position={[0, 3, 0]} size={2.5} speed={0.35} color="white" opacity={0.45} />
+        <Fireflies ref={nightSparklesRef} count={36} phaseRef={phaseRef} />
 
         {/* Clouds visible day and night */}
         <Clouds material={THREE.MeshLambertMaterial} limit={600}>
@@ -175,7 +302,7 @@ function Scene() {
         </Clouds>
       </Suspense>
 
-      <OrbitControls target={[0, 2, 0]} minPolarAngle={Math.PI / 2.5} maxPolarAngle={Math.PI / 2.5} />
+      <OrbitControls target={[0, 2, 0]} minDistance={60} maxDistance={160} minPolarAngle={Math.PI / 2.5} maxPolarAngle={Math.PI / 2.5} />
     </>
   )
 }
@@ -183,7 +310,7 @@ function Scene() {
 export default function App() {
   return (
     <div className="container">
-      <Canvas camera={{ position: [15, 15, 10], fov: 50 }}>
+      <Canvas gl={{ alpha: true }} camera={{ position: [40, 37, 28], fov: 50 }}>
         <Scene />
       </Canvas>
 

@@ -12,30 +12,93 @@
   --utility-size: clamp(0.8rem, 1.55vw, 1.2rem);
   --subtitle-size: clamp(1.15rem, 2.55vw, 1.95rem);
   --logo-size: clamp(6rem, 14.5vw, 12.75rem);
+  --sky-top: #c7e4f6;
+  --sky-bottom: #8dc8ff;
 }
 
 html, body, #root {
   width: 100%;
+  height: 100%;
   min-height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
+  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
 }
 
-.container {
-  position: relative;
-  width: 100%;
+body {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  width: 100dvw;
   height: 100vh;
   height: 100svh;
   height: 100dvh;
+  min-width: 100vw;
+  min-height: 100dvh;
+  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
 }
 
-.container > canvas {
-  position: absolute;
+body::before {
+  content: "";
+  position: fixed;
+  inset: -64px;
+  z-index: -1;
+  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+  pointer-events: none;
+}
+
+.container {
+  position: fixed;
   inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100svh;
+  height: 100dvh;
+  min-width: 100vw;
+  min-width: 100dvw;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: transparent;
+}
+
+.container::before {
+  content: "";
+  position: fixed;
+  inset: -12px;
+  z-index: 0;
+  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+  pointer-events: none;
+}
+
+.container > canvas,
+.container > div:first-child {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1;
+  width: 100vw !important;
+  width: 100dvw !important;
+  height: 100vh !important;
+  height: 100svh !important;
+  height: 100dvh !important;
+  min-width: 100vw;
+  min-width: 100dvw;
+  min-height: 100dvh;
+  overflow: hidden !important;
+}
+
+.container canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .brand-overlay {
   position: absolute;
   inset: 0;
+  z-index: 2;
   display: grid;
   grid-template-rows: auto 1fr auto;
   padding:
@@ -46,6 +109,33 @@ html, body, #root {
   user-select: none;
   color: var(--brand-color);
   text-transform: uppercase;
+}
+
+.brand-overlay::before,
+.brand-overlay::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.brand-overlay::before {
+  top: 0;
+  height: 22vh;
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.2), rgb(0 0 0 / 0));
+}
+
+.brand-overlay::after {
+  bottom: 0;
+  height: 24vh;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.2), rgb(0 0 0 / 0));
+}
+
+.brand-overlay > * {
+  position: relative;
+  z-index: 1;
 }
 
 .brand-topline,
@@ -129,8 +219,8 @@ html, body, #root {
 @media (max-width: 700px) {
   :root {
     --edge-space: clamp(1rem, 4.5vw, 1.75rem);
-    --utility-size: clamp(0.52rem, 2.1vw, 0.72rem);
-    --subtitle-size: clamp(0.85rem, 4.2vw, 1.2rem);
+    --utility-size: clamp(0.62rem, 2.45vw, 0.86rem);
+    --subtitle-size: clamp(0.98rem, 4.55vw, 1.32rem);
     --logo-size: clamp(4rem, 21vw, 6.25rem);
   }
 
